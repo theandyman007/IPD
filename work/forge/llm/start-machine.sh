@@ -8,7 +8,7 @@ if [ -z "$1" ]; then
 fi
 
 HOST="$1"
-MODEL_CONFIG_FILE="$HOME/work/forge/llm/load-model.sh"
+MODEL_CONFIG_FILE="$HOME/IPD/IPD/work/forge/llm/load-model.sh"
 
 echo "=== LLM SINGLE MACHINE STARTUP: $HOST ==="
 echo " "
