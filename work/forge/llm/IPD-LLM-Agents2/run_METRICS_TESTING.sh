@@ -47,8 +47,7 @@ set -e
 #   repeat        -- number of times to repeat the same test case (default: 1)
 
 TESTS=(
-    #need to run below 20-30+ times
-    "testing_capacity_script|episodes=10 rounds=1"
+    "testing_capacity_script|episodes=10 rounds=1 host_0=nickel host_1=nickel"
 
 )
 
