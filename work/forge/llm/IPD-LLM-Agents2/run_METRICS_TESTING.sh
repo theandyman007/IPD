@@ -1,8 +1,8 @@
 #!/bin/bash
 
 ##usage
-# ./runMIPD.sh      ## this runs the experiment, prompting for confirmation
-# ./runMIPD.sh -y   ## this skips the confirmation prompt
+# ./run_METRICS_TESTING.sh      ## this runs the experiment, prompting for confirmation
+# ./run_METRICS_TESTINGS.sh -y   ## this skips the confirmation prompt
 
 
 # Print each command as it runs (good for debugging). uncomment to activate
@@ -12,20 +12,20 @@
 set -e
 
 
-
-
 # ============================================================
 # TEST CASES
 # ============================================================
-# Each entry is:  "key=value key=value ..."
+# Each entry is:  "label|key=value key=value ..."
 # Only include the keys you want to OVERRIDE for that run.
+# Label becomes part of the output filename.
+# if Label is blank, the changed values will instead be appended to the filename
 # Examples of test cases:
-#       "temp=0.3"
-#       "temp=0.7"
-#       "temp=1.2"
-#       "episodes=30 rounds=20"
-#       "system_prompt=my_custom_prompt.txt reflection_type=detailed"
-#       "model_0=gpt-4 model_1=gpt-3.5-turbo host_0=nickel host_1=zinc"
+#       "temp_low|temp=0.3"
+#       "temp_mid|temp=0.7"
+#       "temp_high|temp=1.2"
+#       "long_game|episodes=30 rounds=20"
+#       "custom_prompt|system_prompt=my_custom_prompt.txt reflection_type=detailed"
+#       "model_compare|model_0=gpt-4 model_1=gpt-3.5-turbo host_0=nickel host_1=zinc"
 #
 # Available keys:
 #   episodes      -- number of periods to play
@@ -44,7 +44,7 @@ set -e
 
 TESTS=(
     #need to run below 20-30+ times
-    "episodes=30 rounds=50"
+    "testing_capacity_script|episodes=10 rounds=1"
 
 )
 
@@ -55,7 +55,8 @@ TESTS=(
 # Leave optional args blank to omit them from the command entirely,
 # allowing episodic_ipd_game.py to use its own internal defaults.
 
-results_dir="./outputs/results_testing"
+results_dir="./outputs/capacity_testing/games"
+metrics_dir="./outputs/capacity_testing/metrics"
 
 DEFAULT_EPISODES=""
 DEFAULT_ROUNDS=""
@@ -74,9 +75,10 @@ DEFAULT_REPEAT=1
 # ============================================================
 # RUNNER — no need to edit below this line
 # ============================================================
-
 run_experiment() {
-    local overrides="$1"
+    local label="$1"
+    local overrides="$2"
+    local temp_timestamp="$3"
 
     # Start from defaults
     local episodes=$DEFAULT_EPISODES
@@ -113,8 +115,9 @@ run_experiment() {
             repeat)             ;; # handled in loop, not passed to python
         esac
     done
-    local run_name="episodic_game_$(date +%Y%m%d_%H%M%S)"
 
+    local run_name="episodic_game_${temp_timestamp}_${label}"
+    local game_metrics_file="${metrics_dir}/game_metrics_${batch_timestamp}.csv"
 
     # Build command
     local CMD="python episodic_ipd_game.py"
@@ -132,7 +135,18 @@ run_experiment() {
     [[ -n "$reflection_type" ]]         && CMD+=" --reflection-type $reflection_type"
     CMD+=" --output ${results_dir}/${run_name}.json"
 
-    nohup bash -c "$CMD" > "${results_dir}/${run_name}.log" 2>&1 &
+    # Wrap the game command to record start time, end time, and exit status,
+    # then append a row to the shared CSV for this batch.
+    local WRAPPED="
+        start_time=\$(date +%s);
+        $CMD;
+        exit_code=\$?;
+        end_time=\$(date +%s);
+        elapsed=\$((end_time - start_time));
+        echo \"${run_name},${episodes},${rounds},${window},${temp},${model_0},${model_1},${host_0},${host_1},\${elapsed},\${exit_code}\" >> \"${game_metrics_file}\";
+    "
+
+    nohup bash -c "$WRAPPED" > "${results_dir}/${run_name}.log" 2>&1 &
     echo "Launched: $run_name (PID $!)"
 }
 
@@ -153,20 +167,56 @@ if [[ "$SKIP_CONFIRM" == "false" ]]; then
 fi
 
 mkdir -p "$results_dir"
+mkdir -p "$metrics_dir"
 
+# Timestamp shared across this entire batch (used for filenames)
+batch_timestamp=$(date +%Y%m%d_%H%M%S)
+
+# --- CSV header (one file per batch) ---
+game_metrics_file="${metrics_dir}/game_metrics_${batch_timestamp}.csv"
+echo "run_name,episodes,rounds,window,temp,model_0,model_1,host_0,host_1,elapsed_seconds,exit_code" \
+    > "$game_metrics_file"
+
+# --- GPU monitor: log all GPUs on this machine for the duration of the batch ---
+gpu_log="${metrics_dir}/gpu_${batch_timestamp}.log"
+nvidia-smi dmon -s mu -d 2 \
+    | awk '{print strftime("%Y-%m-%dT%H:%M:%S"), $0; fflush()}' \
+    >> "$gpu_log" &
+GPU_MON_PID=$!
+echo "GPU monitor started (PID $GPU_MON_PID) → $gpu_log"
+
+# --- Launch all test cases ---
 for test_entry in "${TESTS[@]}"; do
-    overrides="$test_entry"
+    label="${test_entry%%|*}"
+    overrides="${test_entry#*|}"
+
+    #Capture timestamp for repeated tests
+    temp_timestamp=$(date +%Y%m%d_%H%M%S)
 
     # Extract repeat count if specified, default to 1
     repeat=$DEFAULT_REPEAT
     for kv in $overrides; do
         [[ "${kv%%=*}" == "repeat" ]] && repeat="${kv#*=}"
     done
-    
+
     for ((i=1; i<=repeat; i++)); do
-        run_experiment "$overrides"
-        sleep 1
+        if [[ -z "$label" ]]; then
+            run_label="${overrides//[ =]/_}"
+        else
+            run_label="$label"
+        fi
+        [[ $repeat -gt 1 ]] && run_label="${run_label}_run${i}"
+        run_experiment "$run_label" "$overrides" "$temp_timestamp"
     done
 done
 
+echo ""
 echo "To view progress, use command: tail -f ${results_dir}/episodic_game_*.log"
+echo ""
+echo "Waiting for all games to finish before stopping GPU monitor..."
+
+# Wait for all background game processes to finish, then stop GPU monitor
+wait
+kill $GPU_MON_PID
+echo "GPU monitor stopped."
+echo "Metrics written to: $metrics_dir/"

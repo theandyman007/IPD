@@ -57,8 +57,7 @@ TESTS=(
 # Leave optional args blank to omit them from the command entirely,
 # allowing episodic_ipd_game.py to use its own internal defaults.
 
-results_dir="./results_testing"
-timestamp=$(date +%Y%m%d_%H%M%S)
+results_dir="./outputs/results_testing"
 
 DEFAULT_EPISODES=""
 DEFAULT_ROUNDS=""
@@ -77,10 +76,10 @@ DEFAULT_REPEAT=1
 # ============================================================
 # RUNNER — no need to edit below this line
 # ============================================================
-
 run_experiment() {
     local label="$1"
     local overrides="$2"
+    local temp_timestamp="$3"
 
     # Start from defaults
     local episodes=$DEFAULT_EPISODES
@@ -118,7 +117,7 @@ run_experiment() {
         esac
     done
 
-    local run_name="episodic_game_${timestamp}_${label}"
+    local run_name="episodic_game_${temp_timestamp}_${label}"
 
     # Build command
     local CMD="python episodic_ipd_game.py"
@@ -162,6 +161,9 @@ for test_entry in "${TESTS[@]}"; do
     label="${test_entry%%|*}"
     overrides="${test_entry#*|}"
 
+    #Capture timestamp for repeated tests
+    temp_timestamp=$(date +%Y%m%d_%H%M%S)
+
     # Extract repeat count if specified, default to 1
     repeat=$DEFAULT_REPEAT
     for kv in $overrides; do
@@ -175,9 +177,9 @@ for test_entry in "${TESTS[@]}"; do
             run_label="$label"
         fi
         [[ $repeat -gt 1 ]] && run_label="${run_label}_run${i}"
-        run_experiment "$run_label" "$overrides"
+        run_experiment "$run_label" "$overrides" "$temp_timestamp"
     done
 done
 
 
-echo "To view progress, use command: tail -f ${results_dir}/episodic_game_${timestamp}_*.log"
+echo "To view progress, use command: tail -f ${results_dir}/episodic_game_*.log"
