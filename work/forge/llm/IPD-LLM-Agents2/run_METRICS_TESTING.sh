@@ -5,6 +5,10 @@
 # ./run_METRICS_TESTINGS.sh -y   ## this skips the confirmation prompt
 
 
+# ============================================================
+# ERROR HANDLING
+# ============================================================
+
 # Print each command as it runs (good for debugging). uncomment to activate
 #set -x
 
@@ -55,6 +59,7 @@ TESTS=(
 # Leave optional args blank to omit them from the command entirely,
 # allowing episodic_ipd_game.py to use its own internal defaults.
 
+# setup for below directories performed in BATCH EXECUTION
 results_dir="./outputs/capacity_testing/games"
 metrics_dir="./outputs/capacity_testing/metrics"
 
@@ -73,7 +78,7 @@ DEFAULT_NO_RESET=true
 DEFAULT_REPEAT=1
 
 # ============================================================
-# RUNNER — no need to edit below this line
+# RUNNER FUNCTION
 # ============================================================
 run_experiment() {
     local label="$1"
@@ -150,7 +155,23 @@ run_experiment() {
     echo "Launched: $run_name (PID $!)"
 }
 
-# Detect -y flag
+
+# ============================================================
+# GUARD RAILS
+# ============================================================
+
+# Detect if tmux is active (protects from dropped SSH sessions)
+if [ -z "$TMUX" ]; then
+    echo ""
+    echo "Warning: you do not appear to be inside a tmux session."
+    echo "Running without tmux risks losing the GPU monitor and wait block if your SSH connection drops."
+    echo ""
+    read -p "Are you running inside tmux? (y/n): " tmux_confirm
+    [[ "$tmux_confirm" != "y" ]] && echo "Exiting. Start tmux with: tmux new -s capacity_test" && exit 1
+    echo ""
+fi
+
+# Detect -y flag (confirms test cases to run)
 SKIP_CONFIRM=false
 [[ "${1:-}" == "-y" ]] && SKIP_CONFIRM=true
 
@@ -166,6 +187,12 @@ if [[ "$SKIP_CONFIRM" == "false" ]]; then
     echo ""
 fi
 
+
+# ============================================================
+# BATCH EXECUTION
+# ============================================================
+
+# Create output directories if not present
 mkdir -p "$results_dir"
 mkdir -p "$metrics_dir"
 
@@ -183,6 +210,7 @@ nvidia-smi dmon -s mu -d 2 \
     | awk '{print strftime("%Y-%m-%dT%H:%M:%S"), $0; fflush()}' \
     >> "$gpu_log" &
 GPU_MON_PID=$!
+trap 'echo "Interrupted. Stopping GPU monitor..."; kill $GPU_MON_PID 2>/dev/null; exit 1' INT TERM
 echo "GPU monitor started (PID $GPU_MON_PID) → $gpu_log"
 
 # --- Launch all test cases ---
