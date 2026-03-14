@@ -47,9 +47,10 @@ set -e
 #   repeat        -- number of times to repeat the same test case (default: 1)
 
 TESTS=(
-    "default_control_nickel|host_0=nickel host_1=nickel"
-    "short_game_nickel|episodes=10 rounds=1 host_0=nickel host_1=nickel"
-    
+    "short_game_nickel|episodes=10 rounds=1 host_0=nickel host_1=nickel repeat=10"
+    "default_control|host_0=nickel host_1=nickel repeat=5"
+    "long_game_nickel|episodes=30 rounds=20 host_0=nickel host_1=nickel repeat=3"
+
 )
 
 # ============================================================
@@ -60,10 +61,10 @@ TESTS=(
 # allowing episodic_ipd_game.py to use its own internal defaults.
 
 # setup for below directories performed in BATCH EXECUTION
-results_dir="./outputs/capacity_testing/games"
+results_dir="./outputs/capacity_testing/games"     # base dir; batch subdir derived after timestamp is set
 metrics_dir="./outputs/capacity_testing/metrics"
 
-DEFAULT_EPISODES=""
+DEFAULT_EPISODES=""             
 DEFAULT_ROUNDS=""
 DEFAULT_WINDOW=""
 DEFAULT_TEMP=""
@@ -137,7 +138,7 @@ run_experiment() {
     [[ -n "$system_prompt" ]]           && CMD+=" --system-prompt $system_prompt"
     [[ -n "$reflection_template" ]]     && CMD+=" --reflection-template $reflection_template"
     [[ -n "$reflection_type" ]]         && CMD+=" --reflection-type $reflection_type"
-    CMD+=" --output ${results_dir}/${run_name}.json"
+    CMD+=" --output ${batch_results_dir}/${run_name}.json"
 
     # Wrap the game command to record absolute start/end timestamps and exit status,
     # then append a row to the shared CSV for this batch.
@@ -154,16 +155,26 @@ run_experiment() {
     # Having start_time + end_time (rather than just elapsed) lets you compute
     # concurrency in post-processing: count how many runs have overlapping
     # [start_time, end_time] intervals at any given moment.
+
+
     local WRAPPED="
         start_time=\$(date +%s);
         $CMD;
         exit_code=\$?;
         end_time=\$(date +%s);
         elapsed=\$((end_time - start_time));
-        echo \"${batch_timestamp},${run_name},\${start_time},\${end_time},\${elapsed},${episodes},${rounds},${window},${temp},${model_0},${model_1},${host_0},${host_1},\${exit_code}\" >> \"${game_metrics_file}\";
+        csv_episodes=\"${episodes:-default}\";
+        csv_rounds=\"${rounds:-default}\";
+        csv_window=\"${window:-default}\";
+        csv_temp=\"${temp:-default}\";
+        csv_model_0=\"${model_0:-default}\";
+        csv_model_1=\"${model_1:-default}\";
+        csv_host_0=\"${host_0:-default}\";
+        csv_host_1=\"${host_1:-default}\";
+        echo \"${batch_timestamp},${run_name},\${start_time},\${end_time},\${elapsed},\${csv_episodes},\${csv_rounds},\${csv_window},\${csv_temp},\${csv_model_0},\${csv_model_1},\${csv_host_0},\${csv_host_1},\${exit_code}\" >> \"${game_metrics_file}\";
     "
 
-    nohup bash -c "$WRAPPED" > "${results_dir}/${run_name}.log" 2>&1 &
+    nohup bash -c "$WRAPPED" > "${batch_results_dir}/${run_name}.log" 2>&1 &
     echo "Launched: $run_name (PID $!)"
 }
 
@@ -204,12 +215,15 @@ fi
 # BATCH EXECUTION
 # ============================================================
 
-# Create output directories if not present
-mkdir -p "$results_dir"
-mkdir -p "$metrics_dir"
-
 # Timestamp shared across this entire batch (used for filenames and batch_id column)
 batch_timestamp=$(date +%Y%m%d_%H%M%S)
+
+# Per-batch subfolder for game outputs: ./outputs/capacity_testing/games/<batch_timestamp>/
+batch_results_dir="${results_dir}/${batch_timestamp}"
+
+# Create output directories if not present
+mkdir -p "$batch_results_dir"
+mkdir -p "$metrics_dir"
 
 # --- CSV header (one file per batch) ---
 # start_time and end_time are Unix epoch seconds.
@@ -240,8 +254,8 @@ for test_entry in "${TESTS[@]}"; do
         [[ -z "$host" ]] && continue                    # skip if host is unset
         [[ -n "${GPU_MON_PIDS[$host]}" ]] && continue  # skip if already monitoring this host
 
-        gpu_log="${metrics_dir}/${batch_timestamp}_gpu_${host}.log"
-        ssh "$host" "nvidia-smi dmon -s mu -d 2" \
+        gpu_log="${metrics_dir}/${batch_timestamp}_${host}_continuous_gpu.csv"
+        ssh "$host" "nvidia-smi dmon -s mu -d 2 -o DT --format csv" \
             >> "$gpu_log" &
         GPU_MON_PIDS[$host]=$!
         echo "GPU monitor started on $host (PID ${GPU_MON_PIDS[$host]}) → $gpu_log"
@@ -280,7 +294,7 @@ for test_entry in "${TESTS[@]}"; do
 done
 
 echo ""
-echo "To view progress, use command: tail -f ${results_dir}/episodic_game_*.log"
+echo "To view progress, use command: tail -f ${batch_results_dir}/episodic_game_*.log"
 echo ""
 echo "Waiting for all games to finish before stopping GPU monitors..."
 
