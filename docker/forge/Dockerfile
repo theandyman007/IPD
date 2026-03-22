@@ -1,29 +1,23 @@
 # Ref: https://docs.docker.com/get-started/docker-concepts/building-images/writing-a-dockerfile/
 # Example build: docker build -t test-forge -f docker/forge/Dockerfile .
-# Example to run: docker run -it test-forge
+# Example to run: docker run -it -e FORGE_USER=carpenter test-forge
 
 FROM python:3.12
 
-# Setup an app user so the container doesn't run as the root user
-# Home directory created to avoid warning with Python packages
-RUN useradd -m mcp
-WORKDIR /home/mcp
+WORKDIR /app
 
-# Install the application dependencies
+# Install the application dependencies (i.e. Python Libraries)
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code from the repo to the Docker Image WorkDir, set ownership to user
-COPY . /home/mcp/
-
-# Grant ownership to the Docker container user
-RUN chown -R mcp:mcp /home/mcp/
+# Copy source code from the repo to the Docker Image Working Directory
+COPY . .
 #EXPOSE 8080
 
-# Change the working directory to the game project directory
-WORKDIR /home/mcp/work/forge/llm/IPD-LLM-Agents2
+# Copy the entrypoint script and make it executable
+COPY docker/forge/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-USER mcp
-
-# Launch the shell
-CMD ["/bin/bash"]
+# User creation and code deployment handled at runtime by entrypoint script
+# Default username is 'mcp' if FORGE_USER is not provided
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

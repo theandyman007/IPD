@@ -2,3 +2,10 @@
 
 # Not currently using the Ray RLLIB code
 work/forge/rllib/
+
+# No need to include GitHub & Docker config files
+.dockerignore
+.github/
+.git/
+.gitignore
+
