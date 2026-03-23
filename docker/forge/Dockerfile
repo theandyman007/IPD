@@ -11,7 +11,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code from the repo to the Docker Image Working Directory
-COPY . .
+COPY work/forge/llm/IPD-LLM-Agents2/ .
 #EXPOSE 8080
 
 # Copy the entrypoint script and make it executable

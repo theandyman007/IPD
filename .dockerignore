@@ -1,11 +1,9 @@
 # Ref: https://docs.docker.com/build/concepts/context/
 
-# Not currently using the Ray RLLIB code
-work/forge/rllib/
+# Exclude everything by default
+*
 
-# No need to include GitHub & Docker config files
-.dockerignore
-.github/
-.git/
-.gitignore
-
+# Include only what the container needs
+!work/forge/llm/IPD-LLM-Agents2/
+!requirements.txt
+!docker/
