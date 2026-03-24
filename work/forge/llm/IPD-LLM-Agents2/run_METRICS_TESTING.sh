@@ -52,11 +52,12 @@ set -e
 #   reflection_type     -- reflection verbosity: minimal | standard | detailed (default: standard)
 #   no_reset      -- prevents resetting context across episodes (true/false)
 #   repeat        -- number of times to repeat the same test case (default: 1)
+#   delay         -- before launching: a number of seconds to sleep, or "wait" to block until the previous test finishes
 
 TESTS=(
-    "high_temp|episodes=50 rounds=20 temp=1.2 host_0=tungsten host_1=tungsten repeat=5"
-    "mid_temp|episodes=50 rounds=20 temp=0.7 host_0=tungsten host_1=tungsten repeat=5"    
-    "low_temp|episodes=50 rounds=20 temp=0.3 host_0=tungsten host_1=tungsten repeat=5"    
+    "high_temp|episodes=30 rounds=20 temp=1.2 host_0=tungsten host_1=tungsten repeat=5"
+    "mid_temp|episodes=30 rounds=20 temp=0.7 host_0=tungsten host_1=tungsten repeat=5"    
+    "low_temp|episodes=30 rounds=20 temp=0.3 host_0=tungsten host_1=tungsten repeat=5"    
 )
 
 # ============================================================
@@ -83,6 +84,7 @@ DEFAULT_REFLECTION_TEMPLATE=""
 DEFAULT_REFLECTION_TYPE=""
 DEFAULT_NO_RESET=true
 DEFAULT_REPEAT=1
+DEFAULT_DELAY=0
 
 # ============================================================
 # RUNNER FUNCTION
@@ -106,6 +108,7 @@ run_experiment() {
     local reflection_type=$DEFAULT_REFLECTION_TYPE
     local no_reset=$DEFAULT_NO_RESET
     local repeat=$DEFAULT_REPEAT
+    local delay=$DEFAULT_DELAY
 
     # Apply overrides (space-separated key=value pairs)
     for kv in $overrides; do
@@ -125,6 +128,7 @@ run_experiment() {
             reflection_type)     reflection_type="$val" ;;
             no_reset)            no_reset="$val" ;;
             repeat)             ;; # handled in loop, not passed to python
+            delay)              ;; # handled in loop, not passed to python
         esac
     done
 
@@ -273,41 +277,88 @@ trap 'echo "Interrupted. Stopping GPU monitors..."; for pid in "${GPU_MON_PIDS[@
 
 # --- Launch all test cases ---
 GAME_PIDS=()
+PREV_PIDS=()  # tracks PIDs of previously launched games (for optional staggering)(used by delay=wait)
 
-for test_entry in "${TESTS[@]}"; do
-    label="${test_entry%%|*}"
-    overrides="${test_entry#*|}"
+ for test_entry in "${TESTS[@]}"; do
+     label="${test_entry%%|*}"
+     overrides="${test_entry#*|}"
+ 
+     #Capture timestamp for repeated tests
+     temp_timestamp=$(date +%Y%m%d_%H%M%S)
+ 
+     # Extract repeat count if specified, default to 1
+     repeat=$DEFAULT_REPEAT
+     delay=$DEFAULT_DELAY      
 
-    #Capture timestamp for repeated tests
-    temp_timestamp=$(date +%Y%m%d_%H%M%S)
-
-    # Extract repeat count if specified, default to 1
-    repeat=$DEFAULT_REPEAT
-    for kv in $overrides; do
-        [[ "${kv%%=*}" == "repeat" ]] && repeat="${kv#*=}"
-    done
-
-    for ((i=1; i<=repeat; i++)); do
-        if [[ -z "$label" ]]; then
-            run_label="${overrides//[ =]/_}"
-        else
-            run_label="$label"
+     for kv in $overrides; do
+         [[ "${kv%%=*}" == "repeat" ]] && repeat="${kv#*=}"
+        [[ "${kv%%=*}" == "delay" ]]  && delay="${kv#*=}"
+     done
+ 
+    # Apply delay before launching this test's runs
+    if [[ "$delay" == "wait" ]]; then
+        if [[ ${#PREV_PIDS[@]} -gt 0 ]]; then
+            echo "Waiting for previous test to finish before launching: $label"
+            for pid in "${PREV_PIDS[@]}"; do
+                wait "$pid" 2>/dev/null || true
+            done
         fi
-        [[ $repeat -gt 1 ]] && run_label="${run_label}_run${i}"
-        run_experiment "$run_label" "$overrides" "$temp_timestamp"
-        GAME_PIDS+=($!)  # capture each game's PID
+    elif [[ -n "$delay" ]] && [[ "$delay" =~ ^[0-9]+$ ]]; then
+        echo "Sleeping ${delay}s before launching: $label"
+        sleep "$delay"
+    fi
+
+    THIS_PIDS=()
+     for ((i=1; i<=repeat; i++)); do
+         if [[ -z "$label" ]]; then
+             run_label="${overrides//[ =]/_}"
+         else
+             run_label="$label"
+         fi
+         [[ $repeat -gt 1 ]] && run_label="${run_label}_run${i}"
+         run_experiment "$run_label" "$overrides" "$temp_timestamp"
+         GAME_PIDS+=($!)  # capture each game's PID
+        THIS_PIDS+=($!)
+     done
+    PREV_PIDS=("${THIS_PIDS[@]}")
     done
+#===========================================
+# below code is the original version without delay handling; keep for reference until delay logic is confirmed working.
+#===========================================
+# for test_entry in "${TESTS[@]}"; do
+#     label="${test_entry%%|*}"
+#     overrides="${test_entry#*|}"
 
-    #===========================================
-    # comment out sleep to run all games as fast as possible;
-    # todo: consider more intelligent staggering based on expected game length or GPU load, rather than fixed sleep
-    # stagger launches to reduce initial load spikes; 
-    # testing if staggering improves performance
-    # testing how concurrency performance evolves over time as games finish and new ones start
-    #===========================================
-    #sleep 10 
+#     #Capture timestamp for repeated tests
+#     temp_timestamp=$(date +%Y%m%d_%H%M%S)
 
-done
+#     # Extract repeat count if specified, default to 1
+#     repeat=$DEFAULT_REPEAT
+#     for kv in $overrides; do
+#         [[ "${kv%%=*}" == "repeat" ]] && repeat="${kv#*=}"
+#     done
+
+#     for ((i=1; i<=repeat; i++)); do
+#         if [[ -z "$label" ]]; then
+#             run_label="${overrides//[ =]/_}"
+#         else
+#             run_label="$label"
+#         fi
+#         [[ $repeat -gt 1 ]] && run_label="${run_label}_run${i}"
+#         run_experiment "$run_label" "$overrides" "$temp_timestamp"
+#         GAME_PIDS+=($!)  # capture each game's PID
+#     done
+
+#     #===========================================
+#     # comment out sleep to run all games as fast as possible;
+#     # todo: consider more intelligent staggering based on expected game length or GPU load, rather than fixed sleep
+#     # stagger launches to reduce initial load spikes; 
+#     # testing if staggering improves performance
+#     # testing how concurrency performance evolves over time as games finish and new ones start
+#     #===========================================
+#     #sleep 10 
+
+# done
 
 echo ""
 echo "To view progress, use command: tail -f ${batch_results_dir}/episodic_game_*.log"
