@@ -4,6 +4,13 @@
 # ./run_METRICS_TESTING.sh      ## this runs the experiment, prompting for confirmation
 # ./run_METRICS_TESTINGS.sh -y   ## this skips the confirmation prompt
 
+# ============================================================
+# To do:
+# - add ability to stagger start times of games
+# - add ability to run games sequentially rather than in parallel (for debugging or low-resource scenarios)
+# - consider more intelligent staggering based on expected game length or GPU load, rather than fixed sleep
+# ============================================================
+
 
 # ============================================================
 # ERROR HANDLING
@@ -47,10 +54,9 @@ set -e
 #   repeat        -- number of times to repeat the same test case (default: 1)
 
 TESTS=(
-    "short_game_nickel|episodes=10 rounds=1 host_0=nickel host_1=nickel repeat=10"
-    "default_control|host_0=nickel host_1=nickel repeat=5"
-    "long_game_nickel|episodes=30 rounds=20 host_0=nickel host_1=nickel repeat=3"
-
+    "high_temp|episodes=50 rounds=20 temp=1.2 host_0=tungsten host_1=tungsten repeat=5"
+    "mid_temp|episodes=50 rounds=20 temp=0.7 host_0=tungsten host_1=tungsten repeat=5"    
+    "low_temp|episodes=50 rounds=20 temp=0.3 host_0=tungsten host_1=tungsten repeat=5"    
 )
 
 # ============================================================
@@ -291,6 +297,16 @@ for test_entry in "${TESTS[@]}"; do
         run_experiment "$run_label" "$overrides" "$temp_timestamp"
         GAME_PIDS+=($!)  # capture each game's PID
     done
+
+    #===========================================
+    # comment out sleep to run all games as fast as possible;
+    # todo: consider more intelligent staggering based on expected game length or GPU load, rather than fixed sleep
+    # stagger launches to reduce initial load spikes; 
+    # testing if staggering improves performance
+    # testing how concurrency performance evolves over time as games finish and new ones start
+    #===========================================
+    #sleep 10 
+
 done
 
 echo ""
