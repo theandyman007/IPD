@@ -2,6 +2,8 @@
 
 **Purpose:** Runs one or more Iterated Prisoner's Dilemma (IPD) games in parallel while capturing per-game timing metrics and GPU utilization data for server capacity analysis.
 
+author's note:
+currently out of date
 ---
 
 ## Usage

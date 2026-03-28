@@ -1,8 +1,13 @@
 #!/bin/bash
 
 ##usage
-# ./run_METRICS_TESTING.sh      ## this runs the experiment, prompting for confirmation
-# ./run_METRICS_TESTINGS.sh -y   ## this skips the confirmation prompt
+# ./run_METRICS_TESTING.sh -t         ## run in testing mode, prompting for confirmation
+# ./run_METRICS_TESTING.sh -e         ## run in experiment mode, prompting for confirmation
+# ./run_METRICS_TESTING.sh -t -y      ## testing mode, skip confirmation
+# ./run_METRICS_TESTING.sh -e -y      ## experiment mode, skip confirmation
+# Output mode flags (required):
+#   -t | --testing     write outputs under ./outputs/testing/
+#   -e | --experiment  write outputs under ./outputs/experimenting/
 
 # ============================================================
 # To do:
@@ -68,8 +73,16 @@ TESTS=(
 # allowing episodic_ipd_game.py to use its own internal defaults.
 
 # setup for below directories performed in BATCH EXECUTION
-results_dir="./outputs/capacity_testing/games"     # base dir; batch subdir derived after timestamp is set
-metrics_dir="./outputs/capacity_testing/metrics"
+
+## old code for reference:
+#results_dir="./outputs/capacity_testing/games_script_testing"     # base dir; batch subdir derived after timestamp is set
+#metrics_dir="./outputs/capacity_testing/metrics_script_testing"   # where GPU monitor logs and game_metrics CSVs go
+
+# Output directories by mode -- resolved after arg parsing below (see GUARD RAILS)
+EXPERIMENT_RESULTS_DIR="./outputs/experimenting/games"
+EXPERIMENT_METRICS_DIR="./outputs/experimenting/metrics"
+TESTING_RESULTS_DIR="./outputs/testing/games"
+TESTING_METRICS_DIR="./outputs/testing/metrics"
 
 DEFAULT_EPISODES=""             
 DEFAULT_ROUNDS=""
@@ -204,9 +217,30 @@ if [ -z "$TMUX" ]; then
     echo ""
 fi
 
-# Detect -y flag (confirms test cases to run)
+# Parse flags: -y (skip confirm), -t/--testing, -e/--experiment
 SKIP_CONFIRM=false
-[[ "${1:-}" == "-y" ]] && SKIP_CONFIRM=true
+OUTPUT_MODE=""
+for arg in "$@"; do
+    case "$arg" in
+        -y)              SKIP_CONFIRM=true ;;
+        -t|--testing)    OUTPUT_MODE="testing" ;;
+        -e|--experiment) OUTPUT_MODE="experiment" ;;
+    esac
+done
+
+if [[ -z "$OUTPUT_MODE" ]]; then
+    echo "Error: must specify an output mode: -t (testing) or -e (experiment)" >&2
+    exit 1
+fi
+
+if [[ "$OUTPUT_MODE" == "experiment" ]]; then
+    results_dir="$EXPERIMENT_RESULTS_DIR"
+    metrics_dir="$EXPERIMENT_METRICS_DIR"
+else
+    results_dir="$TESTING_RESULTS_DIR"
+    metrics_dir="$TESTING_METRICS_DIR"
+fi
+echo "Output mode: $OUTPUT_MODE  →  $results_dir"
 
 if [[ "$SKIP_CONFIRM" == "false" ]]; then
     echo ""
