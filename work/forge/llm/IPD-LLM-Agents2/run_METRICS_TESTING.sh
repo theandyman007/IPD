@@ -63,9 +63,8 @@ set -e
 #                    if repeat is also set and conflicts with N, user will be prompted to confirm
 
 TESTS=(
-    "high_temp|episodes=30 rounds=20 temp=1.2 host_0=tungsten host_1=tungsten repeat=5"
-    "mid_temp|episodes=30 rounds=20 temp=0.7 host_0=tungsten host_1=tungsten repeat=5"    
-    "low_temp|episodes=30 rounds=20 temp=0.3 host_0=tungsten host_1=tungsten repeat=5"    
+    "varied_temperature|episodes=50 rounds=50 host_0=tungsten host_1=tungsten vary=temp:0.3..1.2:10"
+ 
 )
 
 # ============================================================
@@ -266,7 +265,7 @@ fi
 # Timestamp shared across this entire batch (used for filenames and batch_id column)
 batch_timestamp=$(date +%Y%m%d_%H%M%S)
 
-# Per-batch subfolder for game outputs: ./outputs/capacity_testing/games/<batch_timestamp>/
+# Per-batch subfolder for game outputs: ./outputs/OUTPUT_DIRECTORY/games/<batch_timestamp>/
 batch_results_dir="${results_dir}/${batch_timestamp}"
 
 # Create output directories if not present
@@ -329,12 +328,11 @@ PREV_PIDS=()  # tracks PIDs of previously launched games (for optional staggerin
      delay=$DEFAULT_DELAY
      vary_key=""
      vary_vals=()
-     explicit_repeat=false
 
      for kv in $overrides; do
          k="${kv%%=*}"
          v="${kv#*=}"
-         [[ "$k" == "repeat" ]] && repeat="$v" && explicit_repeat=true
+         [[ "$k" == "repeat" ]] && repeat="$v"
          [[ "$k" == "delay" ]]  && delay="$v"
          if [[ "$k" == "vary" ]]; then
              vary_key="${v%%:*}"        # key to vary (e.g. "temp")
@@ -345,17 +343,6 @@ PREV_PIDS=()  # tracks PIDs of previously launched games (for optional staggerin
                  rest="${vary_spec#*\.\.}"
                  range_max="${rest%%:*}"
                  range_n="${rest#*:}"
-                 # Warn if repeat was explicitly set and conflicts with range N
-                 if [[ "$explicit_repeat" == "true" ]] && [[ "$repeat" != "$range_n" ]]; then
-                     echo ""
-                     echo "Warning: conflicting repeat counts for test \"$label\":"
-                     echo "  user's input repeat value          = $repeat"
-                     echo "  number of repeats needed for feature variations = $range_n"
-                     echo "Continuing will use the feature variation count ($range_n)."
-                     read -p "Proceed? (y/n): " vary_confirm
-                     [[ "$vary_confirm" != "y" ]] && echo "Aborted." && exit 1
-                 fi
-                 repeat=$range_n
                  IFS=',' read -ra vary_vals <<< "$(awk -v min="$range_min" -v max="$range_max" -v n="$range_n" '
                      BEGIN {
                          for (i = 0; i < n; i++) {
@@ -366,19 +353,28 @@ PREV_PIDS=()  # tracks PIDs of previously launched games (for optional staggerin
              else
                  # Exact values mode: val1,val2,val3
                  IFS=',' read -ra vary_vals <<< "$vary_spec"
-                 if [[ "$explicit_repeat" == "true" ]] && [[ "$repeat" != "${#vary_vals[@]}" ]]; then
-                     echo ""
-                     echo "Warning: conflicting repeat counts for test \"$label\":"
-                     echo "  user's input repeat value                        = $repeat"
-                     echo "  number of repeats needed for feature variations  = ${#vary_vals[@]}"
-                     echo "Continuing will use the feature variation count (${#vary_vals[@]})."
-                     read -p "Proceed? (y/n): " vary_confirm
-                     [[ "$vary_confirm" != "y" ]] && echo "Aborted." && exit 1
-                 fi
-                 repeat=${#vary_vals[@]}
              fi
          fi
      done
+
+     # Inform user when both vary and repeat are active
+     if [[ -n "$vary_key" ]] && [[ $repeat -gt 1 ]]; then
+         total=$(( ${#vary_vals[@]} * repeat ))
+         echo ""
+         echo "Note: vary and repeat are both set for test \"$label\":"
+         echo "  repeat value                 = $repeat"
+         echo "  number of feature variations = ${#vary_vals[@]}"
+         echo "  total runs for this test     = $total"
+         echo ""
+         if [[ "$SKIP_CONFIRM" == "false" ]]; then
+             echo "Press Ctrl+C to cancel, or wait to continue..."
+             for ((t=5; t>=1; t--)); do
+                 echo -ne "  Starting in ${t}s...\r"
+                 sleep 1
+             done
+             echo ""
+         fi
+     fi
  
     # Apply delay before launching this test's runs
     if [[ "$delay" == "wait" ]]; then
@@ -394,34 +390,50 @@ PREV_PIDS=()  # tracks PIDs of previously launched games (for optional staggerin
     fi
 
     THIS_PIDS=()
-     for ((i=1; i<=repeat; i++)); do
-         if [[ -z "$label" ]]; then
-             run_label="${overrides//[ =]/_}"
-         else
-             run_label="$label"
-         fi
+    if [[ -n "$vary_key" ]]; then
+        # Nested loop: outer = vary values, inner = repeat
+        for vary_idx in "${!vary_vals[@]}"; do
+            vary_val="${vary_vals[$vary_idx]}"
 
-         # Build per-run overrides, substituting the varied value if applicable
-         if [[ -n "$vary_key" ]]; then
-             vary_val="${vary_vals[$((i-1))]}"
-             run_overrides=""
-             for kv in $overrides; do
-                 k="${kv%%=*}"
-                 [[ "$k" == "vary" ]]      && continue  # strip internal directive
-                 [[ "$k" == "$vary_key" ]] && continue  # replaced below
-                 run_overrides+=" $kv"
-             done
-             run_overrides+=" ${vary_key}=${vary_val}"
-             run_label+="_${vary_key}${vary_val}"
-         else
-             run_overrides="$overrides"
-             [[ $repeat -gt 1 ]] && run_label="${run_label}_run${i}"
-         fi
+            # Build overrides with vary key substituted for this variation
+            run_overrides=""
+            for kv in $overrides; do
+                k="${kv%%=*}"
+                [[ "$k" == "vary" ]]      && continue  # strip internal directive
+                [[ "$k" == "$vary_key" ]] && continue  # replaced below
+                run_overrides+=" $kv"
+            done
+            run_overrides+=" ${vary_key}=${vary_val}"
 
-         run_experiment "$run_label" "$run_overrides" "$temp_timestamp"
-         GAME_PIDS+=($!)  # capture each game's PID
-        THIS_PIDS+=($!)
-     done
+            for ((j=1; j<=repeat; j++)); do
+                if [[ -z "$label" ]]; then
+                    run_label="${overrides//[ =]/_}"
+                else
+                    run_label="$label"
+                fi
+                run_label+="_${vary_key}${vary_val}"
+                [[ $repeat -gt 1 ]] && run_label+="_run${j}"
+
+                run_experiment "$run_label" "$run_overrides" "$temp_timestamp"
+                GAME_PIDS+=($!)
+                THIS_PIDS+=($!)
+            done
+        done
+    else
+        # No vary: flat repeat loop (original behavior)
+        for ((i=1; i<=repeat; i++)); do
+            if [[ -z "$label" ]]; then
+                run_label="${overrides//[ =]/_}"
+            else
+                run_label="$label"
+            fi
+            [[ $repeat -gt 1 ]] && run_label="${run_label}_run${i}"
+
+            run_experiment "$run_label" "$overrides" "$temp_timestamp"
+            GAME_PIDS+=($!)
+            THIS_PIDS+=($!)
+        done
+    fi
     PREV_PIDS=("${THIS_PIDS[@]}")
     done
 #===========================================
@@ -461,6 +473,9 @@ PREV_PIDS=()  # tracks PIDs of previously launched games (for optional staggerin
 #     #sleep 10 
 
 # done
+#===========================================================
+# end old code section
+#===========================================================
 
 echo ""
 echo "To view progress, use command: tail -f ${batch_results_dir}/episodic_game_*.log"
