@@ -7,8 +7,8 @@
 # ============================================================
 # To do:
 # - add ability to stagger start times of games
-# - add ability to run games sequentially rather than in parallel (for debugging or low-resource scenarios)
-# - consider more intelligent staggering based on expected game length or GPU load, rather than fixed sleep
+#   - done, needs to be tested: use a "delay" parameter in the test case definition that can either be a fixed number of seconds to sleep before launching, or "wait" to block until the previous test finishes
+# - add arg to allow variation of of one feature across runs, while keeping all others fixed (e.g. temp=0.3, 0.7, 1.2)
 # ============================================================
 
 
