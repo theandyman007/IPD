@@ -1,6 +1,6 @@
 #!/bin/bash
 
-##usage
+## usage
 # ./run_METRICS_TESTING.sh -t         ## run in testing mode, prompting for confirmation
 # ./run_METRICS_TESTING.sh -e         ## run in experiment mode, prompting for confirmation
 # ./run_METRICS_TESTING.sh -t -y      ## testing mode, skip confirmation
@@ -11,9 +11,8 @@
 
 # ============================================================
 # To do:
-# - add ability to stagger start times of games
-#   - done, needs to be tested: use a "delay" parameter in the test case definition that can either be a fixed number of seconds to sleep before launching, or "wait" to block until the previous test finishes
-# - add arg to allow variation of of one feature across runs, while keeping all others fixed (e.g. temp=0.3, 0.7, 1.2)
+# - [X] add ability to stagger start times of games: done, needs to be tested: use a "delay" parameter in the test case definition that can either be a fixed number of seconds to sleep before launching, or "wait" to block until the previous test finishes
+# - [ ] add arg to allow variation of of one feature across runs, while keeping all others fixed (e.g. temp=0.3, 0.7, 1.2)
 # ============================================================
 
 
@@ -58,6 +57,10 @@ set -e
 #   no_reset      -- prevents resetting context across episodes (true/false)
 #   repeat        -- number of times to repeat the same test case (default: 1)
 #   delay         -- before launching: a number of seconds to sleep, or "wait" to block until the previous test finishes
+#   vary          -- vary one key across repeats; two syntax options:
+#                    exact values:  vary=temp:0.3,0.7,1.2         (repeat defaults to number of values)
+#                    range (N steps): vary=temp:0.3..1.2:5        (repeat defaults to N)
+#                    if repeat is also set and conflicts with N, user will be prompted to confirm
 
 TESTS=(
     "high_temp|episodes=30 rounds=20 temp=1.2 host_0=tungsten host_1=tungsten repeat=5"
@@ -142,6 +145,7 @@ run_experiment() {
             no_reset)            no_reset="$val" ;;
             repeat)             ;; # handled in loop, not passed to python
             delay)              ;; # handled in loop, not passed to python
+            vary)               ;; # handled in loop, not passed to python
         esac
     done
 
@@ -320,13 +324,60 @@ PREV_PIDS=()  # tracks PIDs of previously launched games (for optional staggerin
      #Capture timestamp for repeated tests
      temp_timestamp=$(date +%Y%m%d_%H%M%S)
  
-     # Extract repeat count if specified, default to 1
+     # Extract repeat, delay, and vary from this test's overrides
      repeat=$DEFAULT_REPEAT
-     delay=$DEFAULT_DELAY      
+     delay=$DEFAULT_DELAY
+     vary_key=""
+     vary_vals=()
+     explicit_repeat=false
 
      for kv in $overrides; do
-         [[ "${kv%%=*}" == "repeat" ]] && repeat="${kv#*=}"
-        [[ "${kv%%=*}" == "delay" ]]  && delay="${kv#*=}"
+         k="${kv%%=*}"
+         v="${kv#*=}"
+         [[ "$k" == "repeat" ]] && repeat="$v" && explicit_repeat=true
+         [[ "$k" == "delay" ]]  && delay="$v"
+         if [[ "$k" == "vary" ]]; then
+             vary_key="${v%%:*}"        # key to vary (e.g. "temp")
+             vary_spec="${v#*:}"        # everything after first colon (e.g. "0.3,0.7,1.2" or "0.3..1.2:5")
+             if [[ "$vary_spec" == *".."* ]]; then
+                 # Range mode: min..max:N
+                 range_min="${vary_spec%%\.\.*}"
+                 rest="${vary_spec#*\.\.}"
+                 range_max="${rest%%:*}"
+                 range_n="${rest#*:}"
+                 # Warn if repeat was explicitly set and conflicts with range N
+                 if [[ "$explicit_repeat" == "true" ]] && [[ "$repeat" != "$range_n" ]]; then
+                     echo ""
+                     echo "Warning: conflicting repeat counts for test \"$label\":"
+                     echo "  user's input repeat value          = $repeat"
+                     echo "  number of repeats needed for feature variations = $range_n"
+                     echo "Continuing will use the feature variation count ($range_n)."
+                     read -p "Proceed? (y/n): " vary_confirm
+                     [[ "$vary_confirm" != "y" ]] && echo "Aborted." && exit 1
+                 fi
+                 repeat=$range_n
+                 IFS=',' read -ra vary_vals <<< "$(awk -v min="$range_min" -v max="$range_max" -v n="$range_n" '
+                     BEGIN {
+                         for (i = 0; i < n; i++) {
+                             v = (n == 1) ? min : min + i * (max - min) / (n - 1)
+                             printf "%.6g%s", v, (i < n-1 ? "," : "\n")
+                         }
+                     }')"
+             else
+                 # Exact values mode: val1,val2,val3
+                 IFS=',' read -ra vary_vals <<< "$vary_spec"
+                 if [[ "$explicit_repeat" == "true" ]] && [[ "$repeat" != "${#vary_vals[@]}" ]]; then
+                     echo ""
+                     echo "Warning: conflicting repeat counts for test \"$label\":"
+                     echo "  user's input repeat value                        = $repeat"
+                     echo "  number of repeats needed for feature variations  = ${#vary_vals[@]}"
+                     echo "Continuing will use the feature variation count (${#vary_vals[@]})."
+                     read -p "Proceed? (y/n): " vary_confirm
+                     [[ "$vary_confirm" != "y" ]] && echo "Aborted." && exit 1
+                 fi
+                 repeat=${#vary_vals[@]}
+             fi
+         fi
      done
  
     # Apply delay before launching this test's runs
@@ -349,8 +400,25 @@ PREV_PIDS=()  # tracks PIDs of previously launched games (for optional staggerin
          else
              run_label="$label"
          fi
-         [[ $repeat -gt 1 ]] && run_label="${run_label}_run${i}"
-         run_experiment "$run_label" "$overrides" "$temp_timestamp"
+
+         # Build per-run overrides, substituting the varied value if applicable
+         if [[ -n "$vary_key" ]]; then
+             vary_val="${vary_vals[$((i-1))]}"
+             run_overrides=""
+             for kv in $overrides; do
+                 k="${kv%%=*}"
+                 [[ "$k" == "vary" ]]      && continue  # strip internal directive
+                 [[ "$k" == "$vary_key" ]] && continue  # replaced below
+                 run_overrides+=" $kv"
+             done
+             run_overrides+=" ${vary_key}=${vary_val}"
+             run_label+="_${vary_key}${vary_val}"
+         else
+             run_overrides="$overrides"
+             [[ $repeat -gt 1 ]] && run_label="${run_label}_run${i}"
+         fi
+
+         run_experiment "$run_label" "$run_overrides" "$temp_timestamp"
          GAME_PIDS+=($!)  # capture each game's PID
         THIS_PIDS+=($!)
      done
