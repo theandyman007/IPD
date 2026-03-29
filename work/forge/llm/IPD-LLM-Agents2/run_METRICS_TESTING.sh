@@ -54,16 +54,20 @@ set -e
 #   system_prompt       -- path to system prompt file (default: system_prompt.txt)
 #   reflection_template -- path to reflection template file (default: reflection_prompt_template.txt)
 #   reflection_type     -- reflection verbosity: minimal | standard | detailed (default: standard)
-#   no_reset      -- prevents resetting context across episodes (true/false)
+#   no_reset      -- prevents resetting context across episodes (true/false) (default: true)
 #   repeat        -- number of times to repeat the same test case (default: 1)
 #   delay         -- before launching: a number of seconds to sleep, or "wait" to block until the previous test finishes
 #   vary          -- vary one key across repeats; two syntax options:
 #                    exact values:  vary=temp:0.3,0.7,1.2         (repeat defaults to number of values)
 #                    range (N steps): vary=temp:0.3..1.2:5        (repeat defaults to N)
 #                    if repeat is also set and conflicts with N, user will be prompted to confirm
-
+# ============================================================
+# TEST CASES DEFINED BELOW: edit to add/remove/modify test cases for this batch
+# ============================================================
 TESTS=(
-    "varied_temperature|episodes=50 rounds=50 host_0=tungsten host_1=tungsten vary=temp:0.3..1.2:10"
+#    "varied_temperature|episodes=50 rounds=50 host_0=tungsten host_1=tungsten vary=temp:0.3..1.2:10"
+    "single_game|episodes=50 rounds=50 host_0=tungsten host_1=tungsten"
+
  
 )
 
@@ -216,7 +220,7 @@ if [ -z "$TMUX" ]; then
     echo "Running without tmux risks losing the GPU monitor and wait block if your SSH connection drops."
     echo ""
     read -p "Are you running inside tmux? (y/n): " tmux_confirm
-    [[ "$tmux_confirm" != "y" ]] && echo "Exiting. Start tmux with: tmux new -s capacity_test" && exit 1
+    [[ "$tmux_confirm" != "y" ]] && echo -e "Exiting. Start tmux with:\n tmux new -s test_name\n" && exit 1
     echo ""
 fi
 
