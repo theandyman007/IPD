@@ -65,11 +65,12 @@ set -e
 # TEST CASES DEFINED BELOW: edit to add/remove/modify test cases for this batch
 # ============================================================
 TESTS=(
-#    "varied_temperature|episodes=50 rounds=50 host_0=tungsten host_1=tungsten vary=temp:0.3..1.2:10"
-    "single_game|episodes=50 rounds=50 host_0=tungsten host_1=tungsten"
-
- 
+    "concurrency_1|episodes=30 rounds=30 host_0=tungsten host_1=tungsten repeat=1 delay=wait"
+    "concurrency_5|episodes=30 rounds=30 host_0=tungsten host_1=tungsten repeat=5 delay=wait"
+    "concurrency_10|episodes=30 rounds=30 host_0=tungsten host_1=tungsten repeat=10 delay=wait"
+    "concurrency_20|episodes=30 rounds=30 host_0=tungsten host_1=tungsten repeat=20 delay=wait"
 )
+
 
 # ============================================================
 # DEFAULT PARAMETERS
