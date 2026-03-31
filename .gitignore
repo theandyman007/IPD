@@ -20,3 +20,8 @@ data/
 # OS / editor
 .DS_Store
 .vscode/
+
+# temporary notes files
+**/temp.txt
+**/temp_notes.txt
+
