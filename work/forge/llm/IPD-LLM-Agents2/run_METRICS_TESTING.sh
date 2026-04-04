@@ -11,9 +11,15 @@
 
 # ============================================================
 # To do:
-# - [X] add ability to stagger start times of games: done, needs to be tested: use a "delay" parameter in the test case definition that can either be a fixed number of seconds to sleep before launching, or "wait" to block until the previous test finishes
-# - [ ] add arg to allow variation of of one feature across runs, while keeping all others fixed (e.g. temp=0.3, 0.7, 1.2)
 # ============================================================
+
+
+
+# ============================================================
+# Done:
+# ============================================================
+# - [X] add ability to stagger start times of games: done, needs to be tested: use a "delay" parameter in the test case definition that can either be a fixed number of seconds to sleep before launching, or "wait" to block until the previous test finishes
+# - [X] add arg to allow variation of of one feature across runs, while keeping all others fixed (e.g. temp=0.3, 0.7, 1.2)
 
 
 # ============================================================
