@@ -11,5 +11,6 @@ FROM postgres:16
 ENV POSTGRES_DB=forge
 ENV POSTGRES_PASSWORD=forge
 
+COPY docker/database/00_pg_hba.sh /docker-entrypoint-initdb.d/00_pg_hba.sh
 COPY work/forge/llm/IPD-LLM-Agents2/database/setup_forge_db.sql /docker-entrypoint-initdb.d/01_db_setup.sql
 COPY docker/database/setup_forge_db_grants.sql /docker-entrypoint-initdb.d/02_db_grants.sql

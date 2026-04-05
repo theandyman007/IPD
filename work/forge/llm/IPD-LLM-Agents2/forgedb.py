@@ -47,12 +47,13 @@ class ForgeDB:
         # Local ENV used in containerized architecture; default to bare metal cluster
         host = os.environ.get('FORGE_DB_HOST', 'platinum')
         port = int(os.environ.get('FORGE_DB_PORT', '5432'))
+        db_user = os.environ.get('FORGE_DB_USER', user)
         
         self.conn = psycopg.connect(
             host=host,
             port=port,
             dbname=dbname,
-            user=user,
+            user=db_user,
             row_factory=dict_row
         )
     
