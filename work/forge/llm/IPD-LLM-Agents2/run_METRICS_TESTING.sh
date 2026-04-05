@@ -18,7 +18,7 @@
 # ============================================================
 # Done:
 # ============================================================
-# - [X] add ability to stagger start times of games: done, needs to be tested: use a "delay" parameter in the test case definition that can either be a fixed number of seconds to sleep before launching, or "wait" to block until the previous test finishes
+# - [X] add ability to stagger start times of games: done, needs to be tested: use a "group_delay" parameter in the test case definition that can either be a fixed number of seconds to sleep before launching the group, or "wait" to block until the previous test finishes; use "repeat_delay" to sleep between individual run launches within a group
 # - [X] add arg to allow variation of of one feature across runs, while keeping all others fixed (e.g. temp=0.3, 0.7, 1.2)
 
 
@@ -62,7 +62,8 @@ set -e
 #   reflection_type     -- reflection verbosity: minimal | standard | detailed (default: standard)
 #   no_reset      -- prevents resetting context across episodes (true/false) (default: true)
 #   repeat        -- number of times to repeat the same test case (default: 1)
-#   delay         -- before launching: a number of seconds to sleep, or "wait" to block until the previous test finishes
+#   group_delay   -- before launching the whole group: a number of seconds to sleep, or "wait" to block until the previous test finishes
+#   repeat_delay  -- seconds to sleep between each individual run launch within a group (applies to repeat and vary)
 #   vary          -- vary one key across repeats; two syntax options:
 #                    exact values:  vary=temp:0.3,0.7,1.2         (repeat defaults to number of values)
 #                    range (N steps): vary=temp:0.3..1.2:5        (repeat defaults to N)
@@ -71,10 +72,9 @@ set -e
 # TEST CASES DEFINED BELOW: edit to add/remove/modify test cases for this batch
 # ============================================================
 TESTS=(
-    "concurrency_1|episodes=30 rounds=30 host_0=tungsten host_1=tungsten repeat=1 delay=wait"
-    "concurrency_5|episodes=30 rounds=30 host_0=tungsten host_1=tungsten repeat=5 delay=wait"
-    "concurrency_10|episodes=30 rounds=30 host_0=tungsten host_1=tungsten repeat=10 delay=wait"
-    "concurrency_20|episodes=30 rounds=30 host_0=tungsten host_1=tungsten repeat=20 delay=wait"
+  "stagger_none|episodes=10 rounds=20 host_0=tungsten host_1=tungsten repeat=10"
+  "stagger_15s|episodes=10 rounds=20 host_0=tungsten host_1=tungsten repeat=10 group_delay=15"
+  "stagger_wait|episodes=10 rounds=20 host_0=tungsten host_1=tungsten repeat=10 group_delay=wait"
 )
 
 
@@ -110,7 +110,8 @@ DEFAULT_REFLECTION_TEMPLATE=""
 DEFAULT_REFLECTION_TYPE=""
 DEFAULT_NO_RESET=true
 DEFAULT_REPEAT=1
-DEFAULT_DELAY=0
+DEFAULT_GROUP_DELAY=0
+DEFAULT_REPEAT_DELAY=0
 
 # ============================================================
 # RUNNER FUNCTION
@@ -134,7 +135,8 @@ run_experiment() {
     local reflection_type=$DEFAULT_REFLECTION_TYPE
     local no_reset=$DEFAULT_NO_RESET
     local repeat=$DEFAULT_REPEAT
-    local delay=$DEFAULT_DELAY
+    local group_delay=$DEFAULT_GROUP_DELAY
+    local repeat_delay=$DEFAULT_REPEAT_DELAY
 
     # Apply overrides (space-separated key=value pairs)
     for kv in $overrides; do
@@ -154,7 +156,8 @@ run_experiment() {
             reflection_type)     reflection_type="$val" ;;
             no_reset)            no_reset="$val" ;;
             repeat)             ;; # handled in loop, not passed to python
-            delay)              ;; # handled in loop, not passed to python
+            group_delay)        ;; # handled in loop, not passed to python
+            repeat_delay)       ;; # handled in loop, not passed to python
             vary)               ;; # handled in loop, not passed to python
         esac
     done
@@ -334,17 +337,19 @@ PREV_PIDS=()  # tracks PIDs of previously launched games (for optional staggerin
      #Capture timestamp for repeated tests
      temp_timestamp=$(date +%Y%m%d_%H%M%S)
  
-     # Extract repeat, delay, and vary from this test's overrides
+     # Extract repeat, group_delay, repeat_delay, and vary from this test's overrides
      repeat=$DEFAULT_REPEAT
-     delay=$DEFAULT_DELAY
+     group_delay=$DEFAULT_GROUP_DELAY
+     repeat_delay=$DEFAULT_REPEAT_DELAY
      vary_key=""
      vary_vals=()
 
      for kv in $overrides; do
          k="${kv%%=*}"
          v="${kv#*=}"
-         [[ "$k" == "repeat" ]] && repeat="$v"
-         [[ "$k" == "delay" ]]  && delay="$v"
+         [[ "$k" == "repeat" ]]       && repeat="$v"
+         [[ "$k" == "group_delay" ]]  && group_delay="$v"
+         [[ "$k" == "repeat_delay" ]] && repeat_delay="$v"
          if [[ "$k" == "vary" ]]; then
              vary_key="${v%%:*}"        # key to vary (e.g. "temp")
              vary_spec="${v#*:}"        # everything after first colon (e.g. "0.3,0.7,1.2" or "0.3..1.2:5")
@@ -387,22 +392,24 @@ PREV_PIDS=()  # tracks PIDs of previously launched games (for optional staggerin
          fi
      fi
  
-    # Apply delay before launching this test's runs
-    if [[ "$delay" == "wait" ]]; then
+    # Apply group_delay before launching this test's runs
+    if [[ "$group_delay" == "wait" ]]; then
         if [[ ${#PREV_PIDS[@]} -gt 0 ]]; then
             echo "Waiting for previous test to finish before launching: $label"
             for pid in "${PREV_PIDS[@]}"; do
                 wait "$pid" 2>/dev/null || true
             done
         fi
-    elif [[ -n "$delay" ]] && [[ "$delay" =~ ^[0-9]+$ ]]; then
-        echo "Sleeping ${delay}s before launching: $label"
-        sleep "$delay"
+    elif [[ -n "$group_delay" ]] && [[ "$group_delay" =~ ^[0-9]+$ ]] && [[ "$group_delay" -gt 0 ]]; then
+        echo "Sleeping ${group_delay}s before launching: $label"
+        sleep "$group_delay"
     fi
 
     THIS_PIDS=()
     if [[ -n "$vary_key" ]]; then
         # Nested loop: outer = vary values, inner = repeat
+        # run_count tracks total launches across both loops so repeat_delay fires once per run
+        run_count=0
         for vary_idx in "${!vary_vals[@]}"; do
             vary_val="${vary_vals[$vary_idx]}"
 
@@ -417,6 +424,10 @@ PREV_PIDS=()  # tracks PIDs of previously launched games (for optional staggerin
             run_overrides+=" ${vary_key}=${vary_val}"
 
             for ((j=1; j<=repeat; j++)); do
+                if [[ $run_count -gt 0 ]] && [[ "$repeat_delay" =~ ^[0-9]+$ ]] && [[ "$repeat_delay" -gt 0 ]]; then
+                    sleep "$repeat_delay"
+                fi
+
                 if [[ -z "$label" ]]; then
                     run_label="${overrides//[ =]/_}"
                 else
@@ -428,11 +439,16 @@ PREV_PIDS=()  # tracks PIDs of previously launched games (for optional staggerin
                 run_experiment "$run_label" "$run_overrides" "$temp_timestamp"
                 GAME_PIDS+=($!)
                 THIS_PIDS+=($!)
+                run_count=$((run_count + 1))
             done
         done
     else
         # No vary: flat repeat loop (original behavior)
         for ((i=1; i<=repeat; i++)); do
+            if [[ $i -gt 1 ]] && [[ "$repeat_delay" =~ ^[0-9]+$ ]] && [[ "$repeat_delay" -gt 0 ]]; then
+                sleep "$repeat_delay"
+            fi
+
             if [[ -z "$label" ]]; then
                 run_label="${overrides//[ =]/_}"
             else
