@@ -1,0 +1,128 @@
+# Configure FORGE K3s Cluster
+#
+# Purpose:  Label nodes with GPU capabilities and install NVIDIA device plugin.
+# NOTE:     Run after install_k3s.yml has completed successfully.
+#
+# Usage: ansible-playbook -K -i ansible/inventory.ini ansible/configure_k3s.yml
+# Ref: https://docs.k3s.io/
+
+---
+# K3s uses its own embedded containerd, not the system containerd.
+# The NVIDIA runtime must be configured at K3s's containerd path.
+# Ref: https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
+- name: Configure NVIDIA runtime for K3s
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Configure NVIDIA runtime for K3s containerd
+      command: >
+        nvidia-ctk runtime configure
+        --runtime=containerd
+        --config=/var/lib/rancher/k3s/agent/etc/containerd/config.toml.tmpl
+
+    - name: Restart K3s server
+      systemd:
+        name: k3s
+        state: restarted
+      when: inventory_hostname == 'platinum'
+
+    - name: Restart K3s agents
+      systemd:
+        name: k3s-agent
+        state: restarted
+      when: inventory_hostname != 'platinum'
+
+- name: Configure K3s cluster
+  hosts: platinum
+  become: true
+
+  tasks:
+    - name: Wait for all nodes to be ready
+      shell: kubectl get nodes --no-headers | grep -c "Ready"
+      register: ready_count
+      until: ready_count.stdout | int >= groups['all'] | length
+      retries: 30
+      delay: 10
+
+---
+- name: Configure K3s cluster
+  hosts: platinum
+  become: true
+
+  tasks:
+    - name: Wait for all nodes to be ready
+      shell: kubectl get nodes --no-headers | grep -c "Ready"
+      register: ready_count
+      until: ready_count.stdout | int >= groups['all'] | length
+      retries: 30
+      delay: 10
+
+    # Used by K3s pods when selecting specific nodes
+    - name: Label copper GPU capabilities
+      command: >
+        kubectl label node copper
+        gpu-primary=titan-x-pascal
+        gpu-primary-mib=12288
+        gpu-count=1
+        gpu-vram-total-mib=12288
+        --overwrite
+
+    - name: Label iron GPU capabilities
+      command: >
+        kubectl label node iron
+        gpu-primary=titan-x-pascal
+        gpu-primary-mib=12288
+        gpu-count=1
+        gpu-vram-total-mib=12288
+        --overwrite
+
+    - name: Label platinum GPU capabilities
+      command: >
+        kubectl label node platinum
+        gpu-primary=gtx-1660-super
+        gpu-primary-mib=6144
+        gpu-count=1
+        gpu-vram-total-mib=6144
+        --overwrite
+
+    - name: Label nickel GPU capabilities
+      command: >
+        kubectl label node nickel
+        gpu-primary=titan-x-pascal
+        gpu-primary-mib=12288
+        gpu-secondary=gtx-1080ti
+        gpu-secondary-mib=11264
+        gpu-tertiary=gtx-1080ti
+        gpu-tertiary-mib=11264
+        gpu-count=3
+        gpu-vram-total-mib=34816
+        --overwrite
+
+    - name: Label tungsten GPU capabilities
+      command: >
+        kubectl label node tungsten
+        gpu-primary=rtx-6000-ada
+        gpu-primary-mib=49140
+        gpu-count=1
+        gpu-vram-total-mib=49140
+        --overwrite
+
+    - name: Label zinc GPU capabilities
+      command: >
+        kubectl label node zinc
+        gpu-primary=gtx-1080ti
+        gpu-primary-mib=11264
+        gpu-secondary=gtx-1080ti
+        gpu-secondary-mib=11264
+        gpu-count=2
+        gpu-vram-total-mib=22528
+        --overwrite
+
+    # The NVIDIA device plugin enables K3s to recognize and schedule GPU resources.
+    # Once installed, pods can request GPUs using "nvidia.com/gpu" in their resource limits.
+    # Ref: https://github.com/NVIDIA/k8s-device-plugin
+    - name: Install NVIDIA device plugin
+      command: >
+        kubectl apply -f
+        https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.17.0/deployments/static/nvidia-device-plugin.yml        
