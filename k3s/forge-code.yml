@@ -40,7 +40,7 @@ spec:
         - name: FORGE_DB_HOST
           value: "forge-db"
         - name: FORGE_DB_USER
-          value: "postgres"          
+          value: "postgres"
         - name: OLLAMA_HOST_0
           value: "ollama-tungsten"
         - name: OLLAMA_HOST_1
