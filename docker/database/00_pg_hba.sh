@@ -1,4 +1,3 @@
 #!/bin/bash
-# Update database access to trust all
-
-echo "host all all 0.0.0.0/0 trust" >> "$PGDATA/pg_hba.conf"
+# Replace password auth with trust for all connections
+sed -i 's/host all all all scram-sha-256/host all all all trust/' "$PGDATA/pg_hba.conf"

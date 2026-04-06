@@ -18,6 +18,9 @@ kubectl create secret docker-registry ghcr-secret \
   --docker-password=$(read -sp "GitHub PAT: " pat && echo $pat)
 echo ""
 
+echo "Creating persistent storage..."
+kubectl apply -f forge_db-storage.yml
+
 echo "Deploying ForgeDB..."
 kubectl apply -f forge-db.yml
 echo "=== Database deployed ==="
