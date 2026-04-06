@@ -1,20 +1,12 @@
-#*******************************************************************************
 # NVIDIA Toolkit is required for use of Ollama Docker Containers.
-#
+# 
 # Purpose:  Installs NVIDIA Container Toolkit on all cluster nodes
 # Usage:    ansible-playbook -K -i ansible/inventory.ini ansible/install_nvidia_toolkit.yml
 #
 # Refs: 
 # - https://hub.docker.com/r/ollama/ollama
 # - https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html
-#
-# Author:
-#   Emily D. Carpenter
-#   Anderson College of Business and Computing, Regis University
-#   MSDS 696/S71: Data Science Practicum II
-#   Dr. Douglas Hart, Dr. Kellen Sorauf
-#   Practicum II, February-May 2026
-#*******************************************************************************
+
 ---
 - name: Install NVIDIA Container Toolkit
   hosts: all

@@ -1,4 +1,3 @@
-#*******************************************************************************
 # Primary playbook for FORGE cluster setup
 # 
 # Purpose:  Primary controller for managing software on research cluster for project.
@@ -8,7 +7,7 @@
 # 
 # Prerequisites:
 #   1. All nodes must be running Ubuntu Linux
-#   2. SSH access from CONTROL to all nodes (key-based authentication)
+#   2. SSH access from platinum to all nodes (key-based authentication)
 #   3. Sudo privileges on all nodes
 #   4. NVIDIA GPU drivers installed on all GPU nodes (verify: nvidia-smi)
 #   5. Ansible installed on primary host (verify: ansible --version)
@@ -20,14 +19,6 @@
 #
 # After running this playbook:
 #   - Apply K3s manifests: kubectl apply -f k3s/
-#
-# Author:
-#   Emily D. Carpenter
-#   Anderson College of Business and Computing, Regis University
-#   MSDS 696/S71: Data Science Practicum II
-#   Dr. Douglas Hart, Dr. Kellen Sorauf
-#   Practicum II, February-May 2026
-#*******************************************************************************
 
 ---
 - import_playbook: install_docker.yml

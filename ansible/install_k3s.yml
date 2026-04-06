@@ -1,22 +1,13 @@
-#*******************************************************************************
 # Install Lightweight Kubernetes (K3s)
 # 
 # Purpose:  Installs K3s server on primary node, agents on all other nodes.
 # Usage:    ansible-playbook -K -i ansible/inventory.ini ansible/install_k3s.yml
 # 
 # Ref: https://docs.k3s.io/quick-start
-#
-# Author:
-#   Emily D. Carpenter
-#   Anderson College of Business and Computing, Regis University
-#   MSDS 696/S71: Data Science Practicum II
-#   Dr. Douglas Hart, Dr. Kellen Sorauf
-#   Practicum II, February-May 2026
-#*******************************************************************************
 
 ---
 - name: Install K3s server
-  hosts: control
+  hosts: platinum
   become: true
 
   tasks:
@@ -38,15 +29,15 @@
         k3s_node_token: "{{ k3s_token.stdout }}"
 
 - name: Install K3s agents
-  hosts: all:!control
+  hosts: all:!platinum
   become: true
 
   tasks:
     - name: Install K3s agent
       shell: >
         curl -sfL https://get.k3s.io |
-        K3S_URL=https://{{ groups['control'][0] }}:6443
-        K3S_TOKEN={{ hostvars[groups['control'][0]]['k3s_node_token'] }}
+        K3S_URL=https://platinum:6443
+        K3S_TOKEN={{ hostvars['platinum']['k3s_node_token'] }}
         sh -s - --default-runtime=nvidia
       args:
         creates: /usr/local/bin/k3s

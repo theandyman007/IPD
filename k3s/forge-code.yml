@@ -1,0 +1,57 @@
+# FORGE Primary Code Container Deployment
+#
+# Purpose:  Deploy the FORGE research code container for running IPD experiments
+# Usage:    ./forge-shell.sh (see forge-shell.sh for interactive use)
+#
+# Ref: https://kubernetes.io/docs/concepts/workloads/pods/
+#
+# This container is OPTIONAL. Researchers who prefer to develop and modify
+# the game code should clone the repo and run from a virtual environment.
+# This container provides a ready-to-run environment for those who just
+# want to execute experiments without local setup.
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: forge-${FORGE_USER}
+  labels:
+    app: forge
+    user: ${FORGE_USER}
+spec:
+  # User needs to create a secrets entry on their machine for use with private images
+  # kubectl create secret docker-registry ghcr-secret \
+  #   --docker-server=ghcr.io \
+  #   --docker-username=minion1066 \
+  #   --docker-password=$(read -sp "PAT: " pat && echo $pat)      
+  imagePullSecrets:
+    - name: ghcr-secret
+  nodeSelector:
+    kubernetes.io/hostname: platinum
+  containers:
+    - name: forge
+      image: ghcr.io/regis-university-data-science/forge:main
+      imagePullPolicy: Always
+      stdin: true
+      tty: true
+      env:
+        - name: FORGE_USER
+          value: "${FORGE_USER}"
+        - name: FORGE_DB_HOST
+          value: "forge-db"
+        - name: FORGE_DB_USER
+          value: "postgres"          
+        - name: OLLAMA_HOST_0
+          value: "ollama-tungsten"
+        - name: OLLAMA_HOST_1
+          value: "ollama-tungsten"
+        - name: OLLAMA_PORT
+          value: "11434"
+      volumeMounts:
+        - name: results
+          mountPath: /app/results
+  volumes:
+    - name: results
+      hostPath:
+        path: /home/${FORGE_USER}/forge-results
+        type: DirectoryOrCreate

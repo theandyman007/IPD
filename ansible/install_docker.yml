@@ -1,19 +1,8 @@
-#*******************************************************************************
-# Install Docker Engine.
+# Install Docker Engine on all cluster nodes.
 # 
-# Purpose: Required for support of NVIDIA Toolkit.
-#
+# Purpose: required for support of NVIDIA Toolkit.
 # Usage: ansible-playbook -K -i ansible/inventory.ini ansible/install_docker.yml
-#
 # Ref: https://docs.docker.com/engine/install/ubuntu/
-#
-# Author:
-#   Emily D. Carpenter
-#   Anderson College of Business and Computing, Regis University
-#   MSDS 696/S71: Data Science Practicum II
-#   Dr. Douglas Hart, Dr. Kellen Sorauf
-#   Practicum II, February-May 2026
-#*******************************************************************************
 
 ---
 - name: Install Docker Engine

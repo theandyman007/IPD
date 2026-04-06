@@ -1,35 +1,17 @@
-#*******************************************************************************
 # Configure FORGE K3s Cluster
 #
 # Purpose:  Label nodes with GPU capabilities and install NVIDIA device plugin.
 # NOTE:     Run after install_k3s.yml has completed successfully.
 #
 # Usage: ansible-playbook -K -i ansible/inventory.ini ansible/configure_k3s.yml
-#
 # Ref: https://docs.k3s.io/
-#
-# Author:
-#   Emily D. Carpenter
-#   Anderson College of Business and Computing, Regis University
-#   MSDS 696/S71: Data Science Practicum II
-#   Dr. Douglas Hart, Dr. Kellen Sorauf
-#   Practicum II, February-May 2026
-#*******************************************************************************
 
 ---
 - name: Configure K3s cluster
-  hosts: control
+  hosts: platinum
   become: true
 
   tasks:
-    - name: Create FORGE database data directory
-      file:
-        path: "{{ forge_db_storage_path }}"
-        state: directory
-        owner: 999    # PostgreSQL user's UID inside official PostgreSQL Docker image 
-        group: 999
-        mode: '0700'  # PostgreSQL default data directory permissions
-  
     - name: Wait for all nodes to be ready
       shell: kubectl get nodes --no-headers | grep -c "Ready"
       register: ready_count
@@ -38,23 +20,65 @@
       delay: 10
 
     # Used by K3s pods when selecting specific nodes
-    - name: Label node GPU capabilities
+    - name: Label copper GPU capabilities
       command: >
-        kubectl label node {{ item }}
-        gpu-primary={{ hostvars[item]['gpu_primary'] }}
-        gpu-primary-mib={{ hostvars[item]['gpu_primary_mib'] }}
-        {% if hostvars[item]['gpu_secondary'] is defined %}
-          gpu-secondary={{ hostvars[item]['gpu_secondary'] }}
-          gpu-secondary-mib={{ hostvars[item]['gpu_secondary_mib'] }}
-        {% endif %}
-        {% if hostvars[item]['gpu_tertiary'] is defined %}
-          gpu-tertiary={{ hostvars[item]['gpu_tertiary'] }}
-          gpu-tertiary-mib={{ hostvars[item]['gpu_tertiary_mib'] }}
-        {% endif %}
-        gpu-count={{ hostvars[item]['gpu_count'] }}
-        gpu-vram-total-mib={{ hostvars[item]['gpu_vram_total_mib'] }}
+        kubectl label node copper
+        gpu-primary=titan-x-pascal
+        gpu-primary-mib=12288
+        gpu-count=1
+        gpu-vram-total-mib=12288
         --overwrite
-      loop: "{{ groups['all'] }}"
+
+    - name: Label iron GPU capabilities
+      command: >
+        kubectl label node iron
+        gpu-primary=titan-x-pascal
+        gpu-primary-mib=12288
+        gpu-count=1
+        gpu-vram-total-mib=12288
+        --overwrite
+
+    - name: Label platinum GPU capabilities
+      command: >
+        kubectl label node platinum
+        gpu-primary=gtx-1660-super
+        gpu-primary-mib=6144
+        gpu-count=1
+        gpu-vram-total-mib=6144
+        --overwrite
+
+    - name: Label nickel GPU capabilities
+      command: >
+        kubectl label node nickel
+        gpu-primary=titan-x-pascal
+        gpu-primary-mib=12288
+        gpu-secondary=gtx-1080ti
+        gpu-secondary-mib=11264
+        gpu-tertiary=gtx-1080ti
+        gpu-tertiary-mib=11264
+        gpu-count=3
+        gpu-vram-total-mib=34816
+        --overwrite
+
+    - name: Label tungsten GPU capabilities
+      command: >
+        kubectl label node tungsten
+        gpu-primary=rtx-6000-ada
+        gpu-primary-mib=49140
+        gpu-count=1
+        gpu-vram-total-mib=49140
+        --overwrite
+
+    - name: Label zinc GPU capabilities
+      command: >
+        kubectl label node zinc
+        gpu-primary=gtx-1080ti
+        gpu-primary-mib=11264
+        gpu-secondary=gtx-1080ti
+        gpu-secondary-mib=11264
+        gpu-count=2
+        gpu-vram-total-mib=22528
+        --overwrite
 
     # The NVIDIA device plugin enables K3s to recognize and schedule GPU resources.
     # Once installed, pods can request GPUs using "nvidia.com/gpu" in their resource limits.
@@ -62,4 +86,4 @@
     - name: Install NVIDIA device plugin
       command: >
         kubectl apply -f
-        https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/{{ nvidia_device_plugin_version }}/deployments/static/nvidia-device-plugin.yml
+        https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.17.0/deployments/static/nvidia-device-plugin.yml
