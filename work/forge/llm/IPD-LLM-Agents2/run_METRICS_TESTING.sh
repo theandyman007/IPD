@@ -72,9 +72,9 @@ set -e
 # TEST CASES DEFINED BELOW: edit to add/remove/modify test cases for this batch
 # ============================================================
 TESTS=(
-  "stagger_none|episodes=10 rounds=20 host_0=tungsten host_1=tungsten repeat=10"
-  "stagger_15s|episodes=10 rounds=20 host_0=tungsten host_1=tungsten repeat=10 group_delay=15"
-  "stagger_wait|episodes=10 rounds=20 host_0=tungsten host_1=tungsten repeat=10 group_delay=wait"
+  "stagger_none|episodes=30 rounds=30 host_0=tungsten host_1=tungsten repeat=10"
+  "stagger_60|episodes=30 rounds=30 host_0=tungsten host_1=tungsten repeat=10 group_delay=wait repeat_delay=60"
+  "stagger_300|episodes=30 rounds=30 host_0=tungsten host_1=tungsten repeat=10 group_delay=wait repeat_delay=300"
 )
 
 
