@@ -37,6 +37,8 @@ spec:
       env:
         - name: FORGE_USER
           value: "${FORGE_USER}"
+        - name: FORGE_UID
+          value: "${FORGE_UID}"          
         - name: FORGE_DB_HOST
           value: "forge-db"
         - name: FORGE_DB_USER

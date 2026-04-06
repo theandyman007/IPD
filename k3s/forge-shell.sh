@@ -6,6 +6,8 @@
 # Usage:    ./forge-shell.sh
 
 export FORGE_USER=$(whoami)
+export FORGE_UID=$(id -u)
+mkdir -p ~/forge-results
 
 echo "Starting FORGE container for ${FORGE_USER}..."
 envsubst < forge-code.yml | kubectl apply -f -
