@@ -10,8 +10,11 @@ export FORGE_USER=$(whoami)
 echo "Starting FORGE container for ${FORGE_USER}..."
 envsubst < forge-code.yml | kubectl apply -f -
 
+echo "Waiting for pod to start..."
+kubectl wait --for=condition=Ready pod/forge-${FORGE_USER} --timeout=120s
+
 echo "Pod created. Connecting..."
-kubectl exec -it forge-${FORGE_USER} -- /bin/bash
+kubectl exec -it forge-${FORGE_USER} -- su ${FORGE_USER}
 
 echo ""
 echo "Session ended. Your results are saved in ~/forge-results/"
