@@ -20,5 +20,6 @@ kubectl exec -it forge-${FORGE_USER} -- su ${FORGE_USER}
 
 echo ""
 echo "Session ended. Your results are saved in ~/forge-results/"
-echo "To reconnect: kubectl exec -it forge-${FORGE_USER} -- /bin/bash"
+echo ""
+echo "To reconnect: kubectl exec -it forge-${FORGE_USER} -- su ${FORGE_USER}"
 echo "To remove:    kubectl delete pod forge-${FORGE_USER}"
