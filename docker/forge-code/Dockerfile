@@ -1,6 +1,9 @@
 # Ref: https://docs.docker.com/get-started/docker-concepts/building-images/writing-a-dockerfile/
-# Example build: docker build -t test-forge -f docker/forge-code/Dockerfile .
-# Example to run: docker run -it -e FORGE_USER=carpenter test-forge
+#
+# Example build: 
+#   docker build -t test-forge-code -f docker/forge-code/Dockerfile .
+# Example to run: 
+#   docker run -it -e FORGE_USER=techkgirl -e FORGE_UID=$(id -u) test-forge-code
 
 FROM python:3.12
 
