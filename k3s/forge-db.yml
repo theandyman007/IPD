@@ -9,7 +9,7 @@
 # Persistent storage for PostgreSQL data; survives container restarts and redeployments
 # Handled separately in forge-db-storage.yml.
 #
-# NOTE: start the forge-db-storage.hml pod FIRST.
+# NOTE: start the forge-db-storage.yml pod FIRST.
 #
 # Author:
 #   Emily D. Carpenter
