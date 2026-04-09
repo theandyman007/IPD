@@ -2,14 +2,14 @@
 # FORGE PostgreSQL Database Deployment
 #
 # Purpose:  Deploy the ForgeDB container with persistent storage
-# Usage:    kubectl apply -f k3s/forge-db.yml
+# Usage:    kubectl apply -f k3s/manifests/forge-db.yml
 #
 # Ref: https://kubernetes.io/docs/concepts/workloads/pods/
 #
 # Persistent storage for PostgreSQL data; survives container restarts and redeployments
 # Handled separately in forge-db-storage.yml.
 #
-# NOTE: start the forge-db-storage.yml pod FIRST.
+# NOTE: Start the forge-db-storage.yml resources FIRST.
 #
 # Author:
 #   Emily D. Carpenter
@@ -17,8 +17,7 @@
 #   MSDS 696/S71: Data Science Practicum II
 #   Dr. Douglas Hart, Dr. Kellen Sorauf
 #   Practicum II, February-May 2026
-#*******************************************************************************
-
+#**********
 
 ---
 # Deploys the ForgeDB container on the primary host with persistent storage
@@ -49,8 +48,6 @@ spec:
           # Required by PostgreSQL docker container (https://hub.docker.com/_/postgres)
           env:
             - name: POSTGRES_DB
-              value: forge
-            - name: POSTGRES_PASSWORD
               value: forge
           ports:
             - containerPort: 5432

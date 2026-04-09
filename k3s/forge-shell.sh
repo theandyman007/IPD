@@ -1,8 +1,8 @@
 #!/bin/bash
 #*******************************************************************************
-# FORGE K3s Container Deployment
+# FORGE K3s Interactive Research Shell
 # 
-# Purpose:  Start an interactive FORGE pod with persistent results storage
+# Purpose:  Start an interactive FORGE shell session with persistent results storage.
 # Usage:    ./forge-shell.sh
 #
 # Author:
@@ -28,6 +28,8 @@ kubectl exec -it forge-${FORGE_USER} -- su ${FORGE_USER}
 
 echo ""
 echo "Session ended. Your results are saved in ~/forge-results/"
+echo "NOTE: Code changes made inside the container are NOT preserved."
+echo "      Clone the repo and use a virtual environment for development work."
 echo ""
 echo "To reconnect: kubectl exec -it forge-${FORGE_USER} -- su ${FORGE_USER}"
 echo "To remove:    kubectl delete pod forge-${FORGE_USER}"

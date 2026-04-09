@@ -2,7 +2,7 @@
 # FORGE PostgreSQL Persistent Storage
 # 
 # Purpose:  Persistent storage for ForgeDB; survives pod restarts and redeployments
-# Usage:    kubectl apply -f k3s/forge-db-storage.yml
+# Usage:    kubectl apply -f k3s/manifests/forge-db-storage.yml
 #
 # NOTE: Apply this BEFORE forge-db.yml
 #

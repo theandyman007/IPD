@@ -1,9 +1,15 @@
 #!/bin/bash
 #*******************************************************************************
-# Start Forge Lightweight Kubernetes (K3s) cluster pods
+# Start FORGE Lightweight Kubernetes (K3s) Cluster Pods
 # 
-# Purpose:  Allows user to start the pods in the cluster
-# Usage:    ./k3s_start_cluster.sh
+# Purpose:  Deploy and start K3s pods for the research cluster.
+# Usage:    ./k3s/k3s_start_cluster.sh
+#
+# Prerequisites: Run ansible/setup_cluster.sh first
+#
+# Additional consideration: ensure bare-metal Ollama agents are stopped on
+# target machines (if running). Example:
+#   ansible -K -i inventory.ini nickel,zinc -m shell -a "systemctl stop ollama.service" --become
 #
 # Author:
 #   Emily D. Carpenter
@@ -17,7 +23,11 @@
 cd "$(dirname "$0")"
 
 echo "=== Starting FORGE containers ==="
+
+echo "Creating persistent storage..."
 kubectl apply -f manifests/forge-db-storage.yml
+
+echo "Deploying ForgeDB..."
 kubectl apply -f manifests/forge-db.yml
 
 # Uncomment the nodes to be run:
@@ -30,4 +40,9 @@ kubectl apply -f manifests/ollama-zinc.yml
 
 echo ""
 kubectl get pods
+kubectl get services
 echo "=== FORGE containers started ==="
+
+echo ""
+echo "To launch a FORGE code container for interactive use:"
+echo "  ./forge-shell.sh"

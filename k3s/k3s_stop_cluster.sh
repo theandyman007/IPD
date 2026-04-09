@@ -32,4 +32,4 @@ kubectl delete -f manifests/ollama-zinc.yml 2>/dev/null
 kubectl get pods
 echo "=== FORGE containers stopped ==="
 
-echo "NOTE: Database storage (forge-db-storage.yml) preserved at /var/lib/forge/postgres."
+echo "NOTE: PostgreSQL data is preserved/retained at /var/lib/forge/postgres."
