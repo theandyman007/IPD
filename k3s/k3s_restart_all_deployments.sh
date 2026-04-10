@@ -1,6 +1,6 @@
 #!/bin/bash
 #*******************************************************************************
-# Rolling Restart of FORGE K3s Cluster Pods
+# Restart of FORGE K3s Cluster Deployments
 #
 # Purpose:  Restart all running deployments. Note: there will be a brief downtime
 #           while deployments are restarted.

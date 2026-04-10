@@ -10,6 +10,10 @@
 #           For stopping workloads only, use k3s/k3s_stop_cluster.sh instead.
 #           *** Ensure SSH keys are loaded prior to execution (ssh-add)
 #
+#           In the event of delays or issues, execute the following command to
+#           force a shutdown:
+#             kubectl delete pods --all --force --grace-period=0
+#
 # Author:
 #   Emily D. Carpenter
 #   Anderson College of Business and Computing, Regis University
@@ -31,4 +35,4 @@ ansible -K -i inventory.ini control -m shell -a "systemctl stop k3s" --become
 
 echo ""
 echo "=== K3s cluster shut down ==="
-echo "NOTE: To restart the cluster, run: ./initialize_cluster.sh"
+echo "NOTE: To restart the cluster, run: ./restart_k3s_cluster.sh"

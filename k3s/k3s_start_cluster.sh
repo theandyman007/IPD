@@ -5,7 +5,7 @@
 # Purpose:  Deploy and start K3s pods for the research cluster.
 # Usage:    ./k3s_start_cluster.sh
 #
-# Prerequisites: Run ansible/setup_cluster.sh first
+# Prerequisites: Run ansible/install_k3s_cluster.sh first
 #
 # Additional consideration: ensure bare-metal Ollama agents are stopped on
 # target machines (if running). Example:

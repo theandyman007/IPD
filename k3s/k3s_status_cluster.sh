@@ -5,6 +5,11 @@
 # Purpose:  Allows user to check the status of the Kubernetes (k3s) cluster
 # Usage:    ./k3s_status_cluster.sh
 #
+# NOTE:     Users can also run the following standar commands:
+#             kubectl get all
+#             kubectl get pv,pvc
+#           
+#
 # Author:
 #   Emily D. Carpenter
 #   Anderson College of Business and Computing, Regis University

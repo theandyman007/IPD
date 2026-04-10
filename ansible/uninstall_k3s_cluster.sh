@@ -3,7 +3,7 @@
 # Uninstall FORGE K3s Cluster
 #
 # Purpose:  Completely remove K3s from all nodes.
-# Usage:    ./uninstall_cluster.sh
+# Usage:    ./uninstall_k3s_cluster.sh
 #
 # WARNING:  This will destroy all running pods, services, and K3s configuration.
 #           To simply stop the cluster, use shutdown_k3s_cluster.sh instead.

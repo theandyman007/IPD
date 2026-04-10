@@ -3,7 +3,7 @@
 # Restart FORGE K3s Cluster
 #
 # Purpose:  Restart K3s services on all nodes after a shutdown.
-# Usage:    ./restart_cluster.sh
+# Usage:    ./restart_k3s_cluster.sh
 #
 # NOTE:     This restarts K3s infrastructure only. To deploy workloads,
 #           run k3s/k3s_start_cluster.sh after this script completes.
