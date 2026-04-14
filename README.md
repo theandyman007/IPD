@@ -49,8 +49,8 @@ A portable Containerized Architecture was configured to allow research teams to 
 ## Contacts
  
 Principal Investigators:
-- **Douglas Hart**: douglas.hart@regis.edu
-- **Kellen Sorauf**: kellen.sorauf@regis.edu
+- **Douglas Hart**: dhart@regis.edu
+- **Kellen Sorauf**: ksorauf@regis.edu
 
 ---
 
